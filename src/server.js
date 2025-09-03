@@ -1,53 +1,60 @@
-import express from "express";
-import { initDb, pool } from "./db.js";
-
+import express from 'express';
 const app = express();
-const PORT = process.env.PORT || 5000;
+const PORT = 3000;
 
 app.use(express.json());
 
-// Initialize DB
-(async () => {
-    try {
-        await initDb();
-        console.log("✅ Database initialized");
-    } catch (err) {
-        console.error("❌ DB init error:", err);
-    }
-})();
+// In-memory comment store
+let comments = [];
+let nextId = 1;
 
-// Routes
-app.get("/", (req, res) => {
-    res.send("🚀 Server is running with PostgreSQL on Render!");
+// CREATE a comment
+app.post('/comments', (req, res) => {
+    const { text } = req.body;
+    if (!text) return res.status(400).json({ error: 'Text is required' });
+
+    const newComment = { id: nextId++, text };
+    comments.push(newComment);
+    res.status(201).json(newComment);
 });
 
-// Get all comments for a page
-app.get("/comments/:page", async (req, res) => {
-    try {
-        const result = await pool.query(
-            "SELECT * FROM comments WHERE page = $1 ORDER BY created_at DESC",
-            [req.params.page]
-        );
-        res.json(result.rows);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+// READ all comments
+app.get('/comments', (req, res) => {
+    res.json(comments);
 });
 
-// Add a comment
-app.post("/comments", async (req, res) => {
-    try {
-        const { page, content } = req.body;
-        const result = await pool.query(
-            "INSERT INTO comments (page, content) VALUES ($1, $2) RETURNING *",
-            [page, content]
-        );
-        res.status(201).json(result.rows[0]);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+// READ a single comment
+app.get('/comments/:id', (req, res) => {
+    const id = parseInt(req.params.id);
+    const comment = comments.find(c => c.id === id);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+    res.json(comment);
+});
+
+// UPDATE a comment
+app.put('/comments/:id', (req, res) => {
+    const id = parseInt(req.params.id);
+    const { text } = req.body;
+    const comment = comments.find(c => c.id === id);
+    if (!comment) return res.status(404).json({ error: 'Comment not found' });
+
+    if (!text) return res.status(400).json({ error: 'Text is required' });
+
+    comment.text = text;
+    res.json(comment);
+});
+
+// DELETE a comment
+app.delete('/comments/:id', (req, res) => {
+    const id = parseInt(req.params.id);
+    const index = comments.findIndex(c => c.id === id);
+    if (index === -1) return res.status(404).json({ error: 'Comment not found' });
+
+    const deleted = comments.splice(index, 1);
+    res.json(deleted[0]);
 });
 
 app.listen(PORT, () => {
-    console.log(`🌍 Server running on port ${PORT}`);
+    console.log(`Server running on http://localhost:${PORT}`);
 });
