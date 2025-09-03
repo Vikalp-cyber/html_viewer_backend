@@ -1,28 +1,24 @@
-import oracledb from "oracledb";
-import dotenv from "dotenv";
+import pg from "pg";
 
-dotenv.config();
+const { Pool } = pg;
 
-let pool;
+const pool = new Pool({
+    connectionString: process.env.DATABASE_URL,
+    ssl: {
+        rejectUnauthorized: false, // Render requires SSL
+    },
+});
 
-export async function initPool() {
-    if (pool) return pool;
-    pool = await oracledb.createPool({
-        user: process.env.DB_USER,
-        password: process.env.DB_PASSWORD,
-        connectString: process.env.DB_CONNECT_STRING,
-        poolMin: 1,
-        poolMax: 5,
-        poolIncrement: 1
-    });
-    return pool;
+// Create table if it doesn't exist
+async function initDb() {
+    await pool.query(`
+    CREATE TABLE IF NOT EXISTS comments (
+      id SERIAL PRIMARY KEY,
+      page VARCHAR(255) NOT NULL,
+      content TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+  `);
 }
 
-export async function getConnection() {
-    if (!pool) await initPool();
-    return pool.getConnection();
-}
-
-export async function closePool() {
-    if (pool) await pool.close(0);
-}
+export { pool, initDb };
