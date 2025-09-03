@@ -84,6 +84,49 @@ app.delete("/comments/:id", async (req, res) => {
         res.status(500).json({ error: err.message });
     }
 });
+// Get all pages
+app.get("/pages", async (req, res) => {
+    try {
+        const result = await pool.query("SELECT * FROM pages ORDER BY created_at ASC");
+        res.json(result.rows);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Get one page by slug (e.g. /pages/page1)
+app.get("/pages/:slug", async (req, res) => {
+    try {
+        const { slug } = req.params;
+        const result = await pool.query("SELECT * FROM pages WHERE slug = $1", [slug]);
+        if (result.rows.length === 0) {
+            return res.status(404).json({ error: "Page not found" });
+        }
+        // Send back raw HTML
+        res.type("html").send(result.rows[0].content);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// Create a dummy page (admin only in real apps)
+app.post("/pages", async (req, res) => {
+    try {
+        const { slug, title, content } = req.body;
+        if (!slug || !title || !content) {
+            return res.status(400).json({ error: "slug, title, content are required" });
+        }
+
+        const result = await pool.query(
+            "INSERT INTO pages (slug, title, content) VALUES ($1, $2, $3) RETURNING *",
+            [slug, title, content]
+        );
+        res.status(201).json(result.rows[0]);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 
 app.listen(PORT, () => {
     console.log(`🚀 Server running on http://localhost:${PORT}`);
